@@ -1,0 +1,73 @@
+# Common parameters for training
+
+experiment: null # Name of the experiment folder, if null, the yaml file name will be used
+
+demo_train:
+  data_folder: fire_data # Data path relative to the package root (can be absolute path)
+  exp_folder: fire_experiments # Experiment path relative to the package root (can be absolute path)
+  gpu_id: 0 # Gpu id to perform training on (asmk can have a different gpu id)
+
+training:
+  epochs: 200 # Number of epochs to train for
+  optimizer:
+    lr: 3.e-5 # Adam learning rate
+    weight_decay: 1.e-4 # Adam weight decay
+  loss_superfeature:
+    margin: 1.1 # Contrastive loss margin applied on superfeatures
+    weight: 0.02 
+  loss_attention:
+    weight: 0.1
+  lr_scheduler:
+    gamma: 0.99 # Gamma parameter in learning rate decay
+
+  initialize_dim_reduction:
+    images: 5000 # Number of training images (first in the dataset) to use for initializing the dimensionality reduction layer with PCA whitening
+    features_num: null # Number of features to extract per image (null for the default value of model.runtime.features_num)
+
+  dataset:
+    name: retrieval-SfM-120k # Training dataset name
+    mode: train # Training dataset split
+    imsize: 1024 # Image size to train on
+    nnum: 5 # Number of negatives in hard negative mining
+    qsize: 2000 # Number of query images (epoch size)
+    poolsize: 20000 # Pool size to choose hard negatives from
+  loader:
+    batch_size: 5 # Number of queries in a batch
+
+  transform:
+    flip_prob: 0.5
+
+validation:
+  # Picking the best epoch is based on the first score that exists:
+  # - mAP of local descriptor on val_eccv20 dataset (if 'val_eccv20' in local_descriptor.datasets)
+  # - mAP of global descriptor on val_eccv20 dataset (if 'val_eccv20' in global_descriptor.datasets)
+  # - epoch number (always defined)
+  global_descriptor:
+    frequency: null # How often (number of epochs) to run global descriptor validation
+    datasets: [] # On which datasets to run global descriptor validation
+  local_descriptor:
+    frequency: 5 # How often (number of epochs) to run local descriptor validation
+    datasets: [val_eccv20] # On which datasets to run local descriptor validation
+    codebook_training:
+      images: 20000 # Number of training images (first in the dataset) to use for learning the codebook
+      scales: [1] # Scales for multiscale inference
+    asmk:
+      __template__: _asmk_how_fire.yml # load from separate file
+
+model:
+  architecture: resnet50  # Backbone network
+  pretrained: http://download.europe.naverlabs.com/ComputerVision/FIRe/pretraining/fire_imagenet.pth # None or url of the pretrained model
+  skip_layer: 1 # How many layers of blocks will be skipped, counting from end
+  dim_reduction:
+    dim: 128 # The output dimension
+  lit:
+    T: 6
+    N: 256
+    dim: 1024
+  runtime:
+    mean_std: [[0.485, 0.456, 0.406], [0.229, 0.224, 0.225]] # Mean and std normalization of input data
+    image_size: 1024
+    features_num: 1000 # Number of local features to keep in inference (sorted by attention)
+    scales: [2.0, 1.414, 1.0, 0.707, 0.5, 0.353, 0.25] # Scales for multiscale inference
+    training_scales: [1] # Scales to aggregate into a global descriptor during training
+
