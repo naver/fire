@@ -85,3 +85,90 @@ For reproducibility, we provide the following model weights for the architecture
 * Model trained on SfM-120k trained with FIRe [(link)](http://download.europe.naverlabs.com/ComputerVision/FIRe/official/fire.pth)
 
 They will be automatically downloaded when running the training / testing script.
+
+## Dockerfile
+
+For convenience, we provide a dockerfile. You can build it with
+```bash
+docker build --tag naver/fire .
+```
+It does not contain the ``fire_data`` nor ``fire_experiments`` so these need to be stored outside.  
+In ``evaluate.py``, the options ``--data-folder`` and ``--exp-folder`` can be used to overwrite these paths.
+
+example:
+```bash
+docker run --gpus all --rm -it --ipc=host --mount type=bind,source=/local/fire,target=/local/fire --entrypoint bash naver/fire
+python evaluate.py eval_fire.yml --data-folder /local/fire/fire_data --exp-folder /local/fire/fire_experiments
+```
+
+## kapture integration
+
+With ``kapture_compute_pairs.py`` you can compute pairs from datasets that are provided in kapture format ([link to kapture github](https://github.com/naver/kapture)) using FIRe or HOW. These pairs can be used to, e.g., run the kapture visual localization pipeline ([link to kapture-localization github](https://github.com/naver/kapture-localization)).
+``--codebook-cache-path`` can be used to cache the codebook. It only needs to be computed once per model.  
+``--ivf-cache-path`` can be used to cache the ivf database. It needs to be computed once per model per dataset (mapping images).  
+``--model-load``, ``--data-folder`` can be used to overwrite ``demo_eval.net_path`` and ``demo_eval.fire_data``. Note that ``demo_eval.exp_folder`` and ``evaluation.local_descriptor.datasets`` are ignored.
+
+example: extracting top50 FIRe pairs, and top50 HOW pairs for GangnamStation_B2
+```
+docker run --gpus all --rm -it --ipc=host --mount type=bind,source=/local/fire,target=/local/fire --entrypoint bash naver/fire
+
+# prepare dataset
+mkdir /local/fire/kapture_datasets
+cd /local/fire/kapture_datasets
+kapture_download_dataset.py update
+kapture_download_dataset.py install  "GangnamStation_B2*"
+# read license terms and type y [enter] to agree
+cd GangnamStation/B2/release
+kapture_merge.py -v info \
+                 -i test validation \
+                 -o query_all \
+                 --image_transfer link_relative
+
+# extract FIRe pairs
+cd /opt/src/fire
+# map -> map pairs
+python3 kapture_compute_pairs.py -v debug \
+    --parameters eval_fire.yml \
+    --model fire \
+    --data-folder /local/fire/fire_data \
+    --codebook-cache-path /local/fire/fire_codebook \
+    --ivf-cache-path /local/fire/kapture_datasets/GangnamStation/B2/release/fire_ivf \
+    --map /local/fire/kapture_datasets/GangnamStation/B2/release/mapping/ \
+    -o /local/fire/kapture_datasets/GangnamStation/B2/release/pairsfile/mapping/fire_top50.txt \
+    --topk 50
+# query -> map pairs
+python3 kapture_compute_pairs.py -v debug \
+    --parameters eval_fire.yml \
+    --model fire \
+    --data-folder /local/fire/fire_data \
+    --codebook-cache-path /local/fire/fire_codebook \
+    --ivf-cache-path /local/fire/kapture_datasets/GangnamStation/B2/release/fire_ivf \
+    --map /local/fire/kapture_datasets/GangnamStation/B2/release/mapping/ \
+    --query /local/fire/kapture_datasets/GangnamStation/B2/release/query_all \
+    -o /local/fire/kapture_datasets/GangnamStation/B2/release/pairsfile/query/fire_top50.txt \
+    --topk 50
+
+# extract HOW pairs
+cd /opt/src/fire
+# you can use the same data-folder as for fire
+# map -> map pairs
+python3 kapture_compute_pairs.py -v debug \
+    --parameters ../how/examples/params/eccv20/eval_how_r50-_1000.yml \
+    --model how \
+    --data-folder /local/fire/fire_data \
+    --codebook-cache-path /local/fire/how_codebook \
+    --ivf-cache-path /local/fire/kapture_datasets/GangnamStation/B2/release/how_ivf \
+    --map /local/fire/kapture_datasets/GangnamStation/B2/release/mapping/ \
+    -o /local/fire/kapture_datasets/GangnamStation/B2/release/pairsfile/mapping/how_top50.txt \
+    --topk 50
+# query -> map pairs
+python3 kapture_compute_pairs.py -v debug \
+    --parameters ../how/examples/params/eccv20/eval_how_r50-_1000.yml --model fire \
+    --data-folder /local/fire/fire_data \
+    --codebook-cache-path /local/fire/how_codebook \
+    --ivf-cache-path /local/fire/kapture_datasets/GangnamStation/B2/release/how_ivf \
+    --map /local/fire/kapture_datasets/GangnamStation/B2/release/mapping/ \
+    --query /local/fire/kapture_datasets/GangnamStation/B2/release/query_all \
+    -o /local/fire/kapture_datasets/GangnamStation/B2/release/pairsfile/query/how_top50.txt \
+    --topk 50
+```
