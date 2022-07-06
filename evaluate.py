@@ -45,6 +45,8 @@ def main(args):
     parser.add_argument('parameters', type=str, help="Relative path to a yaml file that contains parameters.")
     parser.add_argument("--experiment", "-e", metavar="NAME", dest="experiment")
     parser.add_argument("--model-load", "-ml", metavar="PATH", dest="demo_eval.net_path")
+    parser.add_argument("--data-folder", metavar="PATH", dest="demo_eval.data_folder")
+    parser.add_argument("--exp-folder", metavar="PATH", dest="demo_eval.exp_folder")
     parser.add_argument("--features-num", metavar="NUM",
                         dest="evaluation.inference.features_num", type=int)
     parser.add_argument("--scales", metavar="SCALES", dest="evaluation.inference.scales",
